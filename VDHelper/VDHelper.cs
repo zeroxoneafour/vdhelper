@@ -102,7 +102,7 @@ public class VDHelper
         
         ProcessStartInfo startInfo = new();
         startInfo.WorkingDirectory = game.Path;
-        startInfo.Arguments = $"\"{game.Exec} {game.Args}\"";
+        startInfo.Arguments = $"\"{game.Exec}\" {game.Args}";
         startInfo.FileName = _cfg.VDLocation;
         Console.WriteLine($"Launching {name}");
         Process.Start(startInfo);
