@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
 
 namespace VDHelper;
@@ -75,6 +74,17 @@ public class VDHelper
                 }
                 SetVDPath(_args[1]);
                 break;
+            case "info":
+                if (_args.Length != 2)
+                {
+                    ParseError();
+                    return;
+                }
+                PrintGameInfo(_args[1]);
+                break;
+            case "list":
+                ListGames();
+                break;
             default:
                 ParseError();
                 break;
@@ -83,16 +93,7 @@ public class VDHelper
 
     private void LaunchGame(string name)
     {
-        var games = _cfg.ConfigEntries;
-        ConfigEntry? game = null;
-        foreach (var g in games)
-        {
-            if (g.Name == name)
-            {
-                game = g;
-                break;
-            }
-        }
+        var game = _cfg.GetConfigEntry(name);
 
         if (game is null)
         {
@@ -105,7 +106,8 @@ public class VDHelper
         startInfo.Arguments = $"\"{game.Exec}\" {game.Args}";
         startInfo.FileName = _cfg.VDLocation;
         Console.WriteLine($"Launching {name}");
-        Process.Start(startInfo);
+        Process? proc = Process.Start(startInfo);
+        proc?.WaitForExit();
     }
 
     private void AddGame(string name, string path, string exec, string args)
@@ -134,9 +136,20 @@ public class VDHelper
         _cfg.VDLocation = path;
         WriteConfig();
     }
+
+    private void PrintGameInfo(string name)
+    {
+        var game = _cfg.GetConfigEntry(name);
+        Console.WriteLine(game?.ToString() ?? $"Could not find game {name}");
+    }
+
+    private void ListGames()
+    {
+        Console.WriteLine(String.Join(", ", _cfg.ConfigEntries.Select(ce => ce.Name)));
+    }
     private void ParseError()
     {
-        Console.WriteLine("Failure parsing arguments, try to rtfm next time");
+        Console.WriteLine("Failure parsing arguments, go to github for usage instructions");
     }
 
     private void WriteConfig()

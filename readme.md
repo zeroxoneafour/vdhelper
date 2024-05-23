@@ -6,3 +6,5 @@
 * `remove <name>` - Remove a game
 * `launch <name>` - Launch a game
 * `vdpath <path>` - Set path to virtual desktop streamer executable
+* `info <name>` - Gets game info
+* `list` - Lists all loaded games
