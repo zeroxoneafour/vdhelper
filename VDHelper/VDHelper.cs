@@ -1,159 +1,98 @@
-﻿using System.Diagnostics;
-using System.Text.Json;
+﻿using Microsoft.Win32;
 
 namespace VDHelper;
 
 public class VDHelper
 {
-    private string[] _args;
     private string _configLocation = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "vdhelper.json");
 
     private Config _cfg;
+    private readonly string vdLocation;
 
-    public VDHelper(string[] args)
+    public VDHelper()
     {
-        _args = args;
+        string? vdPath =
+            Registry.LocalMachine.OpenSubKey("SOFTWARE\\Virtual Desktop, Inc.\\Virtual Desktop Streamer")?
+                .GetValue("Path") as string;
+        if (vdPath is null)
+        {
+            throw new Exception("Virtual Desktop not found");
+        }
+        vdLocation = $"{vdPath}\\VirtualDesktop.Streamer.exe";
         if (File.Exists(_configLocation))
         {
             string configString = File.ReadAllText(_configLocation);
-            _cfg = JsonSerializer.Deserialize<Config>(configString)!;
+            _cfg = Config.Deserialize(configString);
         }
         else
         {
             _cfg = new Config();
         }
     }
-
-    public void Run()
+    
+    public void LaunchGame(string name)
     {
-        if (_args.Length == 0)
-        {
-            ParseError();
-            return;
-        }
-        
-        switch (_args[0])
-        {
-            case "launch":
-                if (_args.Length != 2)
-                {
-                    ParseError();
-                    return;
-                }
-                LaunchGame(_args[1]);
-                break;
-            case "add":
-                switch (_args.Length)
-                {
-                    case 4:
-                        AddGame(_args[1], _args[2], _args[3], "");
-                        break;
-                    case 5:
-                        AddGame(_args[1], _args[2], _args[3], _args[4]);
-                        break;
-                    default:
-                        ParseError();
-                        break;
-                }
-                break;
-            case "remove":
-                if (_args.Length != 2)
-                {
-                    ParseError();
-                    return;
-                }
-                RemoveGame(_args[1]);
-                break;
-            case "vdpath":
-                if (_args.Length != 2)
-                {
-                    ParseError();
-                    return;
-                }
-                SetVDPath(_args[1]);
-                break;
-            case "info":
-                if (_args.Length != 2)
-                {
-                    ParseError();
-                    return;
-                }
-                PrintGameInfo(_args[1]);
-                break;
-            case "list":
-                ListGames();
-                break;
-            default:
-                ParseError();
-                break;
-        }
-    }
-
-    private void LaunchGame(string name)
-    {
-        var game = _cfg.GetConfigEntry(name);
+        var game = _cfg.GetGame(name);
 
         if (game is null)
         {
             Console.WriteLine($"Game {name} not found");
             return;
         }
-        
-        ProcessStartInfo startInfo = new();
-        startInfo.WorkingDirectory = game.Path;
-        startInfo.Arguments = $"\"{game.Exec}\" {game.Args}";
-        startInfo.FileName = _cfg.VDLocation;
-        Console.WriteLine($"Launching {name}");
-        Process.Start(startInfo);
+
+        game.Launch(vdLocation);
     }
 
-    private void AddGame(string name, string path, string exec, string args)
+    public void AddNormalGame(string name, string path, string exec, string args)
     {
-        var entries = _cfg.ConfigEntries.Find(x => x.Name == name);
-        if (entries != null)
+        if (_cfg.GetGame(name) is not null)
         {
             Console.WriteLine("Entry already exists");
             return;
         }
-        ConfigEntry entry = new(name, path, exec, args);
-        _cfg.ConfigEntries.Add(entry);
+        NormalGame entry = new(name, path, exec, args);
+        _cfg.Games.Add(entry);
         Console.WriteLine($"Added {name}");
         WriteConfig();
     }
 
-    private void RemoveGame(string name)
+    public void AddSteamGame(string name, string appId, string args)
     {
-        _cfg.ConfigEntries = _cfg.ConfigEntries.FindAll(x => x.Name != name);
+        if (_cfg.GetGame(name) is not null)
+        {
+            Console.WriteLine("Entry already exists");
+            return;
+        }
+
+        SteamGame entry = new(name, appId, args);
+        _cfg.Games.Add(entry);
+        Console.WriteLine($"Added {name}");
+        WriteConfig();
+    }
+
+    public void RemoveGame(string name)
+    {
+        _cfg.Games = _cfg.Games.FindAll(x => x.Name != name);
         Console.WriteLine($"Removed {name}");
         WriteConfig();
     }
-
-    private void SetVDPath(string path)
+    
+    public void PrintGameInfo(string name)
     {
-        _cfg.VDLocation = path;
-        WriteConfig();
-    }
-
-    private void PrintGameInfo(string name)
-    {
-        var game = _cfg.GetConfigEntry(name);
+        var game = _cfg.GetGame(name);
         Console.WriteLine(game?.ToString() ?? $"Could not find game {name}");
     }
 
-    private void ListGames()
+    public void ListGames()
     {
-        Console.WriteLine(String.Join(", ", _cfg.ConfigEntries.Select(ce => ce.Name)));
-    }
-    private void ParseError()
-    {
-        Console.WriteLine("Failure parsing arguments, go to github for usage instructions");
+        Console.WriteLine(String.Join(", ", _cfg.Games.Select(ce => ce.Name)));
     }
 
     private void WriteConfig()
     {
-        string jsonString = JsonSerializer.Serialize(_cfg);
+        string jsonString = _cfg.Serialize();
         File.WriteAllText(_configLocation, jsonString);
     }
 }
