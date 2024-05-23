@@ -106,8 +106,7 @@ public class VDHelper
         startInfo.Arguments = $"\"{game.Exec}\" {game.Args}";
         startInfo.FileName = _cfg.VDLocation;
         Console.WriteLine($"Launching {name}");
-        Process? proc = Process.Start(startInfo);
-        proc?.WaitForExit();
+        Process.Start(startInfo);
     }
 
     private void AddGame(string name, string path, string exec, string args)
